@@ -346,11 +346,16 @@ export class ZoteroAPI {
   /**
    * Select an item in Zotero
    */
-  selectItem(itemId: number): void {
+  /**
+   * Select an item in the library. Resolves once the selection (and the switch
+   * to the library tab) is done, so a caller that opens a reader afterwards can
+   * await it and the reader ends up in front.
+   */
+  async selectItem(itemId: number): Promise<void> {
     try {
       const pane = Zotero.getActiveZoteroPane();
       if (pane) {
-        pane.selectItem(itemId);
+        await pane.selectItem(itemId);
       }
     } catch (error) {
       debug(`Failed to select item ${itemId}: ${error}`);
