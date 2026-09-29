@@ -6,6 +6,7 @@
  */
 
 import { SearchResultsTable } from './results-table';
+import type { ExternalResultFields } from '../core/external-providers';
 import { SearchEngine, searchEngine, SearchResult } from '../core/search-engine';
 import { HybridSearchEngine, HybridSearchResult, SearchMode } from '../core/hybrid-search';
 import { ZoteroAPI } from '../utils/zotero-api';
@@ -1196,7 +1197,7 @@ export class ZotSeekDialogVTable {
       const hybridResult = result as HybridSearchResult;
       const pageNumber = exactPage || hybridResult.pageNumber;
 
-      this.openItem(localId, pageNumber, hybridResult.noteKey);
+      this.openItem(localId, pageNumber, hybridResult.noteKey, (hybridResult as ExternalResultFields).attachmentKey);
     }
   }
 
@@ -1224,7 +1225,7 @@ export class ZotSeekDialogVTable {
       const exactPage = this.resultsTable?.getExactPage(localId);
       const hybridResult = result as HybridSearchResult;
       const pageNumber = exactPage || hybridResult.pageNumber;
-      this.openItem(localId, pageNumber, hybridResult.noteKey);
+      this.openItem(localId, pageNumber, hybridResult.noteKey, (hybridResult as ExternalResultFields).attachmentKey);
     } else {
       // Multiple selection: select all in Zotero library (skip orphans)
       const itemIds = results
@@ -1248,7 +1249,7 @@ export class ZotSeekDialogVTable {
    * no longer resolves falls back to the parent item, so a stale key costs
    * precision, not the click.
    */
-  private async openItem(itemId: number, pageNumber?: number, noteKey?: string): Promise<void> {
+  private async openItem(itemId: number, pageNumber?: number, noteKey?: string, attachmentKey?: string): Promise<void> {
     try {
       const noteId = noteKey ? resolveNoteItemId(itemId, noteKey) : null;
       if (noteId) {
@@ -1265,7 +1266,7 @@ export class ZotSeekDialogVTable {
 
       // If we have a page number, open PDF to that page
       if (pageNumber) {
-        await this.zoteroAPI.openPDFToPage(itemId, pageNumber);
+        await this.zoteroAPI.openPDFToPage(itemId, pageNumber, attachmentKey);
         this.logger.info(`Opened item ${itemId} to page ${pageNumber}`);
       }
 

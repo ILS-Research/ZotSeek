@@ -484,13 +484,15 @@ export class ZoteroAPI {
    * Open PDF to a specific page
    * @param itemId - The parent item ID
    * @param pageNumber - 1-based page number to navigate to
+   * @param attachmentKey - the PDF the page refers to (external book hits: a book can have several PDFs)
    */
-  async openPDFToPage(itemId: number, pageNumber: number): Promise<void> {
+  async openPDFToPage(itemId: number, pageNumber: number, attachmentKey?: string): Promise<void> {
     try {
       const item = this.getItem(itemId);
       if (!item) return;
 
-      const attachment = await item.getBestAttachment();
+      const attachment = (attachmentKey && Zotero.Items.getByLibraryAndKey(item.libraryID, attachmentKey))
+        || await item.getBestAttachment();
       if (!attachment) return;
 
       // Convert 1-based page to 0-based pageIndex
