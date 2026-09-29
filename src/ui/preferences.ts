@@ -4,6 +4,7 @@
  */
 
 import { getZotero } from '../utils/zotero-helper';
+import { SEEKBOOK_PREF, seekBookProvider } from '../core/external-providers';
 import { getString } from '../utils/locale';
 import { autoIndexManager } from '../core/auto-index-manager';
 import { getAllModels, getActiveModelId, getModel, removeServerModel, sanitizeServerModelId, inferServerPrefixes, addServerModel } from '../core/model-registry';
@@ -724,6 +725,8 @@ class PreferencesManager {
       });
     }
 
+    void setupSeekBookOption(doc, Z);
+
     const indexNotesCheckbox = doc.getElementById('zotseek-pref-indexNotes') as any;
     if (indexNotesCheckbox) {
       indexNotesCheckbox.addEventListener('command', () => {
@@ -1226,3 +1229,29 @@ class PreferencesManager {
 
 // Create singleton instance
 export const preferencesManager = new PreferencesManager();
+
+/**
+ * "Include book results from SeekBook": only enabled while SeekBook is installed
+ * and has indexed books. A free function (not a method), see http-tools.ts.
+ */
+export async function setupSeekBookOption(doc: Document, Z: any): Promise<void> {
+  const box = doc.getElementById('zotseek-pref-includeSeekBook') as any;
+  const status = doc.getElementById('zotseek-seekbook-status');
+  if (!box) return;
+  box.checked = Z.Prefs.get(SEEKBOOK_PREF, true) === true;
+  box.addEventListener('command', () => Z.Prefs.set(SEEKBOOK_PREF, box.checked === true, true));
+  let count = 0;
+  let available = false;
+  try {
+    available = seekBookProvider.isAvailable();
+    if (available) count = await seekBookProvider.indexedCount();
+  } catch {
+    available = false;
+  }
+  const usable = available && count > 0;
+  box.disabled = !usable;
+  if (status) {
+    const id = !available ? 'zotseek-seekbook-missing' : count ? 'zotseek-seekbook-ready' : 'zotseek-seekbook-empty';
+    (doc as any).l10n?.setAttributes(status, id, { count });
+  }
+}
