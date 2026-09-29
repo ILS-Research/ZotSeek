@@ -1132,7 +1132,7 @@ Issue #42 adds a second `runtime` to `ModelConfig` alongside the in-process Chro
 
 **Dimension-mismatch guard:** `initServerClient()` calls `client.probe()` (a one-text `/v1/embeddings` call) on every pipeline init and compares the returned vector length against the `dimensions` recorded on the `ModelConfig` when the model was added. A mismatch (the server operator swapped the model behind that name) throws immediately, before any chunk is embedded, rather than silently writing wrong-length vectors into the `chunks` table. The error message tells the user to remove and re-add the model in Settings, which re-probes and records the new dimension count (a re-index is then required, since the old vectors are no longer comparable).
 
-**Loopback enforcement:** every request URL, not just the configured base URL, passes through `assertLoopbackUrl()` at request time, which allow-lists `127.0.0.1`, `localhost` and `[::1]` and rejects everything else, including a redirect target (`fetch` is called with `redirect: 'error'`, so a redirect off-loopback aborts rather than being followed). There is no preference to disable this check.
+**Loopback enforcement:** every request URL, not just the configured base URL, passes through `assertLoopbackUrl()` at request time, which allow-lists `127.0.0.1`, `localhost` and `[::1]` and rejects everything else, including a redirect target (`fetch` is called with `redirect: 'error'`, so a redirect off-loopback aborts rather than being followed). There is no preference to disable this check upstream. The ILS fork adds an explicit allow-list of remote hosts, see [ILS-REMOTE-INFERENCE.md](ILS-REMOTE-INFERENCE.md).
 
 ---
 

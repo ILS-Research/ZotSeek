@@ -54,3 +54,8 @@ pref("extensions.zotero.zotseek.mcpServer.enabled", false);
 // Active embedding model (short id from the model registry).
 // Change requires re-indexing the library with the new model.
 pref("extensions.zotero.zotseek.embeddingModel", "nomic-embed-text-v1.5");
+
+// ILS fork: comma-separated host names that may serve embeddings in addition
+// to loopback (e.g. "ollama.ils.local"). Empty = strictly local. Any host listed
+// here receives the indexed library text and all search queries.
+pref("extensions.zotero.zotseek.server.allowedRemoteHosts", "");
