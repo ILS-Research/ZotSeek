@@ -415,6 +415,9 @@ async function filterReindexTargets(
   return keep;
 }
 
+/** Automatic indexing of the whole library starts this long after startup (ILS fork). */
+const STARTUP_INDEX_DELAY_MS = 30_000;
+
 /**
  * Main plugin class
  */
@@ -425,6 +428,7 @@ class ZotSeekPlugin {
   public vectorStore: IVectorStore | null = null;  // Public for preference pane access
   private initialized = false;
   private indexing = false;
+  private startupIndexTimer: any = null;
   private cleanupNotifierID: string | null = null;
   private collectionMenuPopupHandler: ((event: Event) => void) | null = null;
 
@@ -461,7 +465,7 @@ class ZotSeekPlugin {
     const defaults: { [key: string]: any } = {
       'zotseek.minSimilarityPercent': 30,  // 30% = 0.3
       'zotseek.topK': 20,
-      'zotseek.autoIndex': false,
+      'zotseek.autoIndex': true,       // ILS fork: on, including the whole library after startup
       'zotseek.autoIndexDelay': 10,   // Seconds to wait after last item before auto-indexing
       'zotseek.indexingMode': 'full',  // 'abstract' or 'full' - full paper mode is default for better search quality
       'zotseek.maxTokens': 2000,       // Firefox 140+ handles larger chunks efficiently
@@ -579,6 +583,15 @@ class ZotSeekPlugin {
     this.checkAndOfferResume().catch((e: any) => {
       this.logger.debug(`checkAndOfferResume failed: ${e?.message || e}`);
     });
+
+    // With auto-indexing on, index the rest of the library in the background,
+    // a little after startup so Zotero comes up undisturbed.
+    this.startupIndexTimer = setTimeout(() => {
+      this.startupIndexTimer = null;
+      this.autoIndexLibrary().catch((e: any) => {
+        this.logger.warn(`Automatic library indexing failed: ${e?.message || e}`);
+      });
+    }, STARTUP_INDEX_DELAY_MS);
 
     // Piggyback on Zotero's idle database maintenance to compact our own
     // attached database (Zotero 10+; no-op on older versions).
@@ -1236,6 +1249,44 @@ class ZotSeekPlugin {
       progressWindow.error(`Failed to clear index: ${error.message || error}`, true);
       this.showAlert(`Failed to clear index: ${error.message || error}`);
     }
+  }
+
+  /**
+   * Automatic indexing of the whole library (ILS fork): when auto-indexing is
+   * on, index the items of the index scope that are not in the index yet,
+   * without asking. Runs after startup and when auto-indexing is switched on;
+   * new items are then picked up by the auto-index manager as before. Nothing
+   * happens (no progress window) when everything is indexed already.
+   */
+  public async autoIndexLibrary(): Promise<void> {
+    const Z = getZotero();
+    if (!Z || this.indexing) return;
+    if (Z.Prefs.get('zotseek.autoIndex', true) !== true) return;
+
+    const userLibraryID = Z.Libraries.userLibraryID;
+    const all = this.getIndexScope() === 'all';
+    const items: any[] = all
+      ? await this.zoteroAPI.getAllLibraryItems()
+      : await this.zoteroAPI.getLibraryItems(userLibraryID);
+    const scope: BulkScope = all ? { type: 'all-libraries' } : { type: 'library', libraryId: userLibraryID };
+
+    await this.ensureStoreReady();
+    if (!this.vectorStore) return;
+    const pending: any[] = [];
+    for (const item of items) {
+      if (!item?.isRegularItem?.() || hasExcludeTag(item)) continue;
+      const identity = identityFromItem(item);
+      if (!identity) continue;
+      if (!(await this.vectorStore.isIndexedByIdentity(identity.libraryKey, identity.itemKey))) pending.push(item);
+    }
+    if (pending.length === 0) {
+      this.logger.info('Automatic library indexing: everything is indexed');
+      return;
+    }
+    if (this.indexing) return;
+
+    this.logger.info(`Automatic library indexing: ${pending.length} items not indexed yet`);
+    await this.indexItems(pending, scope);
   }
 
   /**
@@ -2458,6 +2509,8 @@ class ZotSeekPlugin {
   }
 
   async onShutdown(): Promise<void> {
+    if (this.startupIndexTimer) clearTimeout(this.startupIndexTimer);
+    this.startupIndexTimer = null;
     this.logger.info('Shutting down plugin');
 
     // Unregister cleanup observer
