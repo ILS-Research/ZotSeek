@@ -754,6 +754,8 @@ class PreferencesManager {
         // Reload auto-index manager to apply new setting
         autoIndexManager.reload();
         this.updateAutoIndexDelayVisibility(checked);
+        // ILS fork: switching it on also indexes what is not indexed yet
+        if (checked) Z.ZotSeek.autoIndexLibrary?.().catch((e: any) => this.logger.warn(`Automatic library indexing failed: ${e?.message || e}`));
       });
     }
 
