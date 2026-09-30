@@ -4,7 +4,8 @@
 
 pref("extensions.zotero.zotseek.minSimilarityPercent", 30);
 pref("extensions.zotero.zotseek.topK", 20);
-pref("extensions.zotero.zotseek.autoIndex", false);
+// ILS fork: on by default; also indexes the whole library (not yet indexed items) after startup
+pref("extensions.zotero.zotseek.autoIndex", true);
 pref("extensions.zotero.zotseek.autoIndexDelay", 10);
 
 // Index scope: "user" (My Library only) or "all" (all libraries including groups)
