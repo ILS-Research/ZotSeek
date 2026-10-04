@@ -21,7 +21,7 @@ zotseek-toolbar-findSimilar = Find Similar Documents
 
 ## Preference pane
 
-zotseek-pref-title = ZotSeek
+zotseek-pref-title = ZotSeek (ILS-Fassung)
 zotseek-pref-indexStatistics = Index Statistics
 zotseek-pref-papersIndexed = Papers Indexed
 zotseek-pref-totalChunks = Total Chunks
