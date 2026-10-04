@@ -21,7 +21,7 @@ zotseek-toolbar-findSimilar = 查找相似文献
 
 ## Preference pane
 
-zotseek-pref-title = ZotSeek
+zotseek-pref-title = ZotSeek (ILS-Fassung)
 zotseek-pref-indexStatistics = 索引统计
 zotseek-pref-papersIndexed = 已索引文献
 zotseek-pref-totalChunks = 总分块数
