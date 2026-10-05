@@ -6,6 +6,7 @@
 
 import { Logger } from '../utils/logger';
 import { getString } from '../utils/locale';
+import { itemTitle } from '../utils/item-metadata';
 import { searchDialogWithVTable } from './search-dialog-with-vtable';
 import { similarDocumentsWrapper } from './similar-documents-wrapper';
 
@@ -428,7 +429,7 @@ export class ToolbarButton {
         return;
       }
 
-      const title = item.getField('title') || attachment.getField('title');
+      const title = itemTitle(item) || attachment.getField('title');
       this.logger.info(`Reader button clicked - finding similar documents for: ${title} (ID: ${item.id})`);
       
       // Open the similar documents dialog for the parent item

@@ -4,6 +4,7 @@
 
 import { Logger } from '../utils/logger';
 import { getZotero } from '../utils/zotero-helper';
+import { itemTitle } from '../utils/item-metadata';
 
 class SimilarDocumentsWrapper {
   private logger: Logger;
@@ -27,7 +28,7 @@ class SimilarDocumentsWrapper {
     try {
       const windowArgs = {
         sourceItemId: sourceItem.id,
-        sourceTitle: sourceItem.getField('title'),
+        sourceTitle: itemTitle(sourceItem),
       };
 
       const win = Z.getMainWindow().openDialog(

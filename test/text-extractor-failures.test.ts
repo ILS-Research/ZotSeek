@@ -42,6 +42,10 @@ function item(id: number, opts: ItemOpts = {}): any {
       if (field === 'abstractNote') return ABSTRACT;
       return '';
     },
+    // Zotero computes the display title through getField, so it fails with it.
+    getDisplayTitle() {
+      return this.getField('title');
+    },
     getNotes: () => [],
   };
 }

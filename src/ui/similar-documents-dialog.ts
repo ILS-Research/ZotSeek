@@ -8,6 +8,7 @@ import { SearchResultsTable } from './results-table';
 import { searchEngine, SearchResult } from '../core/search-engine';
 import { Logger } from '../utils/logger';
 import { getZotero } from '../utils/zotero-helper';
+import { itemDate, itemTitle } from '../utils/item-metadata';
 import { getString } from '../utils/locale';
 import { exportItemsToNewCollection } from './collection-export';
 
@@ -137,7 +138,7 @@ class SimilarDocumentsDialog {
         try {
           const sourceItem = await Z.Items.getAsync(this.sourceItemId);
           if (sourceItem) {
-            const fetchedTitle: string = sourceItem.getField('title') || '';
+            const fetchedTitle: string = itemTitle(sourceItem);
             this.sourceTitle = fetchedTitle;
             this.setSourceInfo(fetchedTitle);
           }
@@ -222,13 +223,13 @@ class SimilarDocumentsDialog {
         const item = await Z.Items.getAsync(localId);
         if (item) {
           const enriched: any = {
-            title: item.getField('title') || result.title || 'Untitled',
+            title: itemTitle(item) || result.title || 'Untitled',
             authors: [],
             year: undefined,
           };
 
           // Get year from date field
-          const dateStr = item.getField('date');
+          const dateStr = itemDate(item);
           if (dateStr) {
             const yearMatch = dateStr.match(/\d{4}/);
             if (yearMatch) {

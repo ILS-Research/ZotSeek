@@ -6,6 +6,7 @@
  */
 
 import { TextSourceType } from '../core/vector-store-sqlite';
+import { itemDate, itemTitle } from './item-metadata';
 
 declare const Zotero: any;
 
@@ -280,7 +281,7 @@ export class ZoteroAPI {
    * Extract text from item (title + abstract, with fulltext fallback)
    */
   async extractText(item: ZoteroItem): Promise<{ text: string; source: TextSourceType }> {
-    const title = item.getField('title') || '';
+    const title = itemTitle(item);
     const abstract = item.getField('abstractNote') || '';
 
     // Prefer title + abstract
@@ -337,7 +338,7 @@ export class ZoteroAPI {
    * Get year from item
    */
   getYear(item: ZoteroItem): number | null {
-    const date = item.getField('date');
+    const date = itemDate(item);
     if (!date) return null;
     const year = parseInt(date.substring(0, 4), 10);
     return isNaN(year) ? null : year;

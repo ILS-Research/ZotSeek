@@ -17,6 +17,7 @@ import { SearchEngine, SearchResult } from './search-engine';
 import { TextSourceType } from './vector-store-sqlite';
 import { ChunkMatch, keywordTerms } from './keyword-backfill';
 import { KeywordMatchFacts, resolveKeywordMatches } from './keyword-parents';
+import { itemDate, itemTitle } from '../utils/item-metadata';
 
 declare const Zotero: any;
 
@@ -541,7 +542,7 @@ export class HybridSearchEngine {
           let score = 0.5; // Base score
 
           // Title matching
-          const title = (item.getField('title') || '').toLowerCase();
+          const title = itemTitle(item).toLowerCase();
           let titleMatchCount = 0;
           for (const term of queryTerms) {
             if (title.includes(term)) {
@@ -560,8 +561,7 @@ export class HybridSearchEngine {
 
           // Year matching
           if (queryYear) {
-            const itemDate = item.getField('date') || '';
-            if (itemDate.includes(queryYear)) {
+            if (itemDate(item).includes(queryYear)) {
               score += 0.15; // Year match bonus
             }
           }
@@ -728,10 +728,10 @@ export class HybridSearchEngine {
         const item = await Zotero.Items.getAsync(result.itemId);
         if (item) {
           result.itemKey = item.key;
-          result.title = item.getField('title') || 'Untitled';
+          result.title = itemTitle(item) || 'Untitled';
 
           // Get year from date field
-          const dateStr = item.getField('date');
+          const dateStr = itemDate(item);
           if (dateStr) {
             const yearMatch = dateStr.match(/\d{4}/);
             if (yearMatch) {
