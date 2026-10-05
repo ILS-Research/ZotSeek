@@ -19,6 +19,7 @@ import { textExtractor, ExtractedText, ExtractedChunks } from './core/text-extra
 import { ZoteroAPI } from './utils/zotero-api';
 import { getIndexingMode } from './utils/chunker';
 import { getZotero } from './utils/zotero-helper';
+import { itemTitle } from './utils/item-metadata';
 import { autoIndexManager, isNoteIndexingEnabled } from './core/auto-index-manager';
 import { getString } from './utils/locale';
 // Use stable progress window from toolkit to avoid crashes
@@ -2357,7 +2358,7 @@ class ZotSeekPlugin {
     }
 
     const item = selectedItems[0];
-    const title = item.getField('title');
+    const title = itemTitle(item);
     this.logger.info(`Finding papers similar to: ${title}`);
     this.logger.info(`Item ID: ${item.id}, Key: ${item.key}, Type: ${typeof item.id}`);
 

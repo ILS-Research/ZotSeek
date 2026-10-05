@@ -13,6 +13,7 @@
 
 import { Logger } from '../utils/logger';
 import { identityFromItem } from './identity-resolver';
+import { itemTitle } from '../utils/item-metadata';
 
 declare const Zotero: any;
 
@@ -225,7 +226,7 @@ export class AutoIndexManager {
           const parent = await Zotero.Items.getAsync(item.parentID as number);
           if (parent && !parent.deleted && this.shouldProcess(parent)) {
             const verb = event === 'trash' ? 'Note trashed on' : event === 'modify' ? 'Note edited on' : 'Note added on';
-            this.logger.info(`${verb}: ${parent.getField('title')}`);
+            this.logger.info(`${verb}: ${itemTitle(parent)}`);
             this.pendingItems.add(parent.id as number);
             this.scheduleBatch(this.noteDelaySeconds());
           }
@@ -238,7 +239,7 @@ export class AutoIndexManager {
         // or bulk metadata edits, which would otherwise serialize a 2s delay
         // per touched item inside this loop.
         if (event === 'add' && this.shouldProcess(item)) {
-          this.logger.info(`New item detected: ${item.getField('title')}`);
+          this.logger.info(`New item detected: ${itemTitle(item)}`);
           // Small delay to let attachments arrive
           await this.delay(2000);
           await this.enqueueIfReady(item);
@@ -276,7 +277,7 @@ export class AutoIndexManager {
     }
 
     // Must have a title
-    const title = item.getField('title') as string;
+    const title = itemTitle(item);
     if (!title || title.trim() === '') {
       return false;
     }
@@ -393,7 +394,7 @@ export class AutoIndexManager {
       // Ready to index
       this.clearWaitingState(itemId);
       this.pendingItems.add(itemId);
-      this.logger.info(`Queued for auto-indexing: ${item.getField('title')}`);
+      this.logger.info(`Queued for auto-indexing: ${itemTitle(item)}`);
       this.scheduleBatch();
       return;
     }

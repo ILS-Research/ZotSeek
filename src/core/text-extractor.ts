@@ -20,6 +20,7 @@ import {
   getIndexingMode
 } from '../utils/chunker';
 import { noteHtmlToText } from '../utils/note-text';
+import { itemTitle } from '../utils/item-metadata';
 import { identityFromItem } from './identity-resolver';
 import { TextSourceType } from './vector-store-sqlite';
 
@@ -86,7 +87,7 @@ export function describeItem(item: any): string {
   const parts = [`item ${item?.id ?? '?'}`];
 
   try {
-    const title = item?.getField?.('title');
+    const title = itemTitle(item);
     if (title) parts.push(`"${title}"`);
   } catch {
     /* unreadable title: the id and identity still say which item it is */
@@ -152,7 +153,7 @@ export class TextExtractor {
    */
   async extractFromItem(item: ZoteroItem): Promise<ExtractedText | null> {
     try {
-      const title = item.getField('title') || 'Untitled';
+      const title = itemTitle(item) || 'Untitled';
       
       // Extract text using preferred sources
       const { text, source } = await this.zoteroAPI.extractText(item);
@@ -191,7 +192,7 @@ export class TextExtractor {
     onError?: (message: string) => void
   ): Promise<ExtractedChunks | null> {
     try {
-      const title = item.getField('title') || 'Untitled';
+      const title = itemTitle(item) || 'Untitled';
       const abstract = item.getField('abstractNote') || null;
 
       // Get indexing mode from preference if not specified
@@ -307,7 +308,7 @@ export class TextExtractor {
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      const title = item.getField('title') || 'Untitled';
+      const title = itemTitle(item) || 'Untitled';
 
       // Report progress
       if (onProgress) {
@@ -375,7 +376,7 @@ export class TextExtractor {
       // batch before extraction was even attempted. describeItem never throws.
       let title: string;
       try {
-        title = item.getField('title') || 'Untitled';
+        title = itemTitle(item) || 'Untitled';
       } catch {
         title = describeItem(item);
       }

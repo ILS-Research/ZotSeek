@@ -2,6 +2,13 @@
 
 All notable changes to ZotSeek - Semantic Search for Zotero will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Cases, statutes and emails no longer show as "Untitled" in search results and in Find Similar Documents. Zotero stores the name of these item types in a field of their own (Case Name, Name of Act, Subject) and presents it as the title, but ZotSeek read only the generic title field, which these types leave empty. Results now show the title exactly as the Zotero items list does, so a case appears with its reporter or court, as in "Donoghue v Stevenson (AC)". The Year column was empty for the same reason on cases, statutes and patents, whose date is Date Decided, Date Enacted or Issue Date, and is now filled in. Searching for a case name now gives the case the same title-match boost an article gets from its title. Cases, statutes and emails added to the library are now indexed automatically as well; auto-index had been skipping them for having no title.
+
+  For items indexed before this version, the search window and Find Similar Documents show the correct title without any action, since they read it from Zotero. What was stored at indexing time still says "Untitled": the `find_similar` tool of the local MCP server returns that stored title, and the indexed text begins with it, because the title is written in front of every indexed passage and a search by meaning compares against that text. To index these items under their real names, select them (an Advanced Search for Item Type is Case finds every case), then choose **Remove from Index** and **Index Selected Items** from the ZotSeek menu.
+
 ## [1.22.4] - 2026-09-24
 
 ### Fixed
