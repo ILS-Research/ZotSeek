@@ -1,5 +1,5 @@
 /**
- * HTTP launcher endpoint: GET /zotseek/open?target=select|pdf&key=...&library=...&page=...
+ * HTTP launcher endpoint: GET /zotseek/open?target=select|pdf&key=...&library=...&page=...&annotation=...
  *
  * Many chat clients only linkify http(s) URLs, so zotero:// deep links are
  * not clickable in them — and embedded webviews additionally block the
@@ -13,7 +13,8 @@
  * Mirrors Zotero's own zotero:// protocol handlers: select uses
  * Zotero_Tabs.select('zotero-pane') + ZoteroPane.selectItems; pdf uses
  * Zotero.FileHandlers.open(item, {location: {pageIndex: page - 1}})
- * (pageIndex is 0-based; our page param is the 1-based page number).
+ * (pageIndex is 0-based; our page param is the 1-based page number), or
+ * {location: {annotationID}} to open on an annotation of that attachment.
  *
  * This endpoint opts into browser traffic (allowRequestsFromUnsafeWebContent):
  * clicks arrive from real browsers/webviews (Mozilla/ UA), which Zotero's
@@ -39,6 +40,8 @@ interface OpenParams {
   key: string;
   library: string; // 'user' | 'group:<id>'
   page?: number;
+  /** Key of an annotation of the attachment to open on (pdf only). */
+  annotation?: string;
 }
 
 /** Parse and strictly validate query params; null when anything is off. */
@@ -47,6 +50,7 @@ export function parseOpenParams(sp: URLSearchParams): OpenParams | null {
   const key = (sp.get('key') || '').trim().toUpperCase();
   const library = (sp.get('library') || 'user').trim();
   const pageRaw = sp.get('page');
+  const annotationRaw = (sp.get('annotation') || '').trim().toUpperCase();
   if (target !== 'select' && target !== 'pdf') return null;
   if (!KEY_RE.test(key)) return null;
   if (library !== 'user' && !GROUP_RE.test(library)) return null;
@@ -56,7 +60,12 @@ export function parseOpenParams(sp: URLSearchParams): OpenParams | null {
     page = parseInt(pageRaw, 10);
     if (page < 1) return null;
   }
-  return { target, key, library, page };
+  let annotation: string | undefined;
+  if (annotationRaw) {
+    if (target !== 'pdf' || !KEY_RE.test(annotationRaw)) return null;
+    annotation = annotationRaw;
+  }
+  return { target, key, library, page, annotation };
 }
 
 /** zotero:// URI for the manual-fallback link shown on the result page. */
@@ -68,10 +77,11 @@ export function buildZoteroUri(params: OpenParams): string {
   if (params.target === 'select') {
     return `zotero://select/${prefix}/items/${params.key}`;
   }
-  return (
-    `zotero://open-pdf/${prefix}/items/${params.key}` +
-    (params.page ? `?page=${params.page}` : '')
-  );
+  const query = [
+    params.page ? `page=${params.page}` : '',
+    params.annotation ? `annotation=${params.annotation}` : '',
+  ].filter(Boolean).join('&');
+  return `zotero://open-pdf/${prefix}/items/${params.key}` + (query ? `?${query}` : '');
 }
 
 function isPrefetch(headers: any): boolean {
@@ -116,8 +126,14 @@ async function performOpenAction(params: OpenParams): Promise<string | null> {
     await zp.selectItems([itemID]);
   } else {
     const item = Zotero.Items.get(itemID);
-    const location = params.page ? { pageIndex: params.page - 1 } : undefined;
-    await Zotero.FileHandlers.open(item, { location });
+    // Zotero's own open-pdf handler sets both: the reader goes to the
+    // annotation when it exists and to the page otherwise.
+    const location: { pageIndex?: number; annotationID?: string } = {};
+    if (params.page) location.pageIndex = params.page - 1;
+    if (params.annotation) location.annotationID = params.annotation;
+    await Zotero.FileHandlers.open(item, {
+      location: Object.keys(location).length ? location : undefined,
+    });
   }
   if (win) activateZotero(win);
   return null;
@@ -148,7 +164,8 @@ export async function handleOpenRequest(requestData: any): Promise<EndpointRespo
       400,
       'text/plain',
       'Invalid parameters. Expected: target=select|pdf, key=<8-char item key>, ' +
-        'optional library=user|group:<id>, optional page=<n> (pdf only).',
+        'optional library=user|group:<id>, optional page=<n> (pdf only), ' +
+        'optional annotation=<8-char annotation key> (pdf only).',
     ];
   }
   // Link-preview prefetchers must not trigger the action; the real click

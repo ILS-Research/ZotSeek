@@ -25,6 +25,8 @@ export interface MatchedChunk {
   textSource?: string;
   /** Key of the child note the excerpt came from ('note' chunks only). */
   noteKey?: string;
+  /** Key of the annotation the excerpt came from ('annotation' only). */
+  annotationKey?: string;
 }
 
 export interface ResultLinks {
@@ -32,7 +34,10 @@ export interface ResultLinks {
   select: string;
   /** http launcher equivalent of `select`, for clients that only linkify http(s) URLs */
   selectHttp: string;
-  /** Opens the PDF in Zotero's reader, at the matched page when known */
+  /**
+   * Opens the PDF in Zotero's reader, at the matched page when known, or on
+   * the matched annotation when the excerpt is one
+   */
   openPdf?: string;
   /** http launcher equivalent of `openPdf` */
   openPdfHttp?: string;
@@ -129,7 +134,7 @@ export function componentScores(r: {
 }
 
 function chunkOf(
-  r: { chunkText?: string; pageNumber?: number; textSource?: string; noteKey?: string }
+  r: { chunkText?: string; pageNumber?: number; textSource?: string; noteKey?: string; annotationKey?: string }
 ): MatchedChunk | null {
   if (!r.chunkText && r.pageNumber === undefined) return null;
   return {
@@ -137,6 +142,7 @@ function chunkOf(
     page: r.pageNumber,
     textSource: r.textSource || undefined,
     noteKey: r.noteKey || undefined,
+    annotationKey: r.annotationKey || undefined,
   };
 }
 
@@ -154,12 +160,15 @@ function libraryKeyForItemId(itemId: number | undefined): string | null {
  * zotero:// deep links for a result. `select` always works; `openPdf` is
  * added when the item has a PDF attachment, pointing at the matched page
  * when known. Note: open-pdf needs the ATTACHMENT key, not the parent
- * item key — resolved via getBestAttachment().
+ * item key — resolved via getBestAttachment(), except for an annotation
+ * excerpt, which names its own attachment: the link opens the reader on the
+ * annotation, in whichever attachment holds it (PDF, EPUB or snapshot).
  */
 async function buildLinks(
   libraryKey: string | null,
   itemKey: string,
-  page?: number
+  page?: number,
+  annotation?: { annotationKey?: string; attachmentKey?: string }
 ): Promise<ResultLinks | undefined> {
   if (!itemKey) return undefined;
   const isGroup = !!libraryKey && libraryKey.startsWith('group:');
@@ -173,6 +182,12 @@ async function buildLinks(
     select: `zotero://select/${prefix}/items/${itemKey}`,
     selectHttp: `${openBase}?target=select&key=${itemKey}${libParam}`,
   };
+  if (annotation?.annotationKey && annotation.attachmentKey) {
+    const query = (page ? `page=${page}&` : '') + `annotation=${annotation.annotationKey}`;
+    links.openPdf = `zotero://open-pdf/${prefix}/items/${annotation.attachmentKey}?${query}`;
+    links.openPdfHttp = `${openBase}?target=pdf&key=${annotation.attachmentKey}${libParam}&${query}`;
+    return links;
+  }
   try {
     const libraryId = isGroup
       ? Zotero.Groups.getLibraryIDFromGroupID(Number(libraryKey!.slice('group:'.length)))
@@ -203,7 +218,7 @@ async function mapHybridResult(r: HybridSearchResult): Promise<ToolResultItem> {
     ...componentScores(r),
     source: r.source,
     matchedChunk: chunkOf(r),
-    links: await buildLinks(libraryKey, r.itemKey, r.pageNumber),
+    links: await buildLinks(libraryKey, r.itemKey, r.pageNumber, r),
   };
 }
 

@@ -93,6 +93,17 @@ const DEFAULT_COLUMNS: ResultsTableColumn[] = [
   },
 ];
 
+/**
+ * "p. 8, ¶3" for a passage, "p. 8" when the paragraph is unknown, as it is for
+ * an annotation (issue #65): defaulting the paragraph to the first claimed a
+ * position the result does not have.
+ */
+function formatLocation(pageNumber: number, paragraphIndex?: number): string {
+  return paragraphIndex === undefined || paragraphIndex === null
+    ? `p. ${pageNumber}`
+    : `p. ${pageNumber}, ¶${paragraphIndex + 1}`;
+}
+
 export class SearchResultsTable {
   private logger: Logger;
   private tableHelper: InstanceType<typeof VirtualizedTableHelper> | null = null;
@@ -328,8 +339,7 @@ export class SearchResultsTable {
       ? (result as HybridSearchResult).paragraphIndex
       : (result as SearchResult).paragraphIndex;
     if (pageNumber) {
-      const paraNum = (paragraphIndex ?? 0) + 1;  // Convert to 1-based
-      formattedPage = `p. ${pageNumber}, ¶${paraNum}`;
+      formattedPage = formatLocation(pageNumber, paragraphIndex);
     }
 
     // Create the row data object with EXACT column dataKey names
@@ -369,6 +379,7 @@ export class SearchResultsTable {
       case 'findings': return getString('source-results');
       case 'content': return getString('source-content');
       case 'note': return getString('source-note');
+      case 'annotation': return getString('source-annotation');
       default: return '';
     }
   }
@@ -877,8 +888,7 @@ export class SearchResultsTable {
     const pageNumber = (result as any).pageNumber as number | undefined;
     const paragraphIndex = (result as any).paragraphIndex as number | undefined;
     if (pageNumber) {
-      const para = (paragraphIndex ?? 0) + 1;
-      meta.push(`📍 ${getString('column-location')}: p. ${pageNumber}, ¶${para}`);
+      meta.push(`📍 ${getString('column-location')}: ${formatLocation(pageNumber, paragraphIndex)}`);
     }
     const sectionLabel = this.formatSource(
       isHybrid ? (result as HybridSearchResult).textSource : (result as SearchResult).textSource
