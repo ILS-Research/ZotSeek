@@ -2,7 +2,7 @@
 
 All notable changes to ZotSeek - Semantic Search for Zotero will be documented in this file.
 
-## [Unreleased]
+## [1.22.6] - 2026-10-08
 
 ### Fixed
 - A search result found through the comment or highlighted text of an annotation now shows that annotation, and opening it takes you to the annotation in the PDF. Zotero's keyword search has always matched annotations, and Hybrid and Keyword search credited the match to the paper, but the result showed no excerpt in Keyword mode, and in Hybrid mode a passage of the paper chosen for being close in meaning to the query, often one without any of the words you typed. Annotation comments are not in ZotSeek's index, so for a phrase you wrote only in a comment no passage could contain it. The comment is now shown with the passage it comments on, the Section column reads **Annotation**, and Location gives the annotation's page. A passage from the paper that contains as many of your words is still preferred, because it is an equally true excerpt. Semantic search does not cover annotations; that is a separate request (#65). The MCP server reports these results with `textSource: "annotation"` and an `annotationKey`, and their `openPdf` link opens the reader on the annotation.
