@@ -17,6 +17,15 @@ import { SearchEngine, SearchResult } from './search-engine';
 import { TextSourceType } from './vector-store-sqlite';
 import { ChunkMatch, keywordTerms } from './keyword-backfill';
 import { KeywordMatchFacts, resolveKeywordMatches } from './keyword-parents';
+import {
+  AnnotationCandidate,
+  AnnotationChoice,
+  AnnotationEvidence,
+  annotationPageNumber,
+  annotationSnippet,
+  annotationWins,
+  chooseAnnotationEvidence,
+} from './keyword-annotations';
 import { itemDate, itemTitle } from '../utils/item-metadata';
 
 declare const Zotero: any;
@@ -55,6 +64,8 @@ export interface HybridSearchResult {
   pageNumber?: number;        // 1-based page number
   paragraphIndex?: number;    // 0-based paragraph index within page
   noteKey?: string;           // Key of the child note the matched chunk came from
+  annotationKey?: string;     // Key of the annotation a keyword hit came from (textSource 'annotation')
+  attachmentKey?: string;     // Key of that annotation's attachment, which the reader opens
 
   // Multi-query scores (for tooltip display in multi-query search)
   queryScores?: number[];     // Individual scores from each query
@@ -104,6 +115,13 @@ export interface QueryAnalysis {
   semanticWeight: number;
   reasoning: string;
   detectedPatterns: string[];
+}
+
+/** One item the keyword leg found, with the annotation that matched, if one did. */
+interface KeywordHit {
+  itemId: number;
+  score: number;
+  annotation?: AnnotationChoice;
 }
 
 /**
@@ -159,6 +177,7 @@ async function describeKeywordMatches(matchedIds: number[]): Promise<KeywordMatc
         itemType: item.itemType,
         isRegularItem,
         owner: owner && owner.id !== id ? { itemId: owner.id, itemType: owner.itemType } : null,
+        annotation: item.itemType === 'annotation' ? describeAnnotation(item) : undefined,
       });
     } catch (e) {
       Zotero.debug(`[ZotSeek:HybridSearch] Could not describe match ${id}: ${(e as any)?.message || e}`);
@@ -166,6 +185,40 @@ async function describeKeywordMatches(matchedIds: number[]): Promise<KeywordMatc
   }
 
   return facts;
+}
+
+/**
+ * What a matched annotation says and where it lives, so the result it is
+ * credited to can show it and open it (issue #65). Undefined when the annotation has
+ * no attachment key to open it by.
+ */
+function describeAnnotation(item: any): AnnotationEvidence | undefined {
+  const attachmentKey = item.parentKey;
+  if (!attachmentKey) return undefined;
+  return {
+    annotationKey: item.key,
+    attachmentKey,
+    comment: item.annotationComment || '',
+    text: item.annotationText || '',
+    pageNumber: annotationPageNumber(item.annotationPosition),
+  };
+}
+
+/**
+ * Make an annotation the excerpt of a keyword hit, replacing whatever passage
+ * the back-fill chose. The passage's location goes with it, since it no longer
+ * describes what is shown; the back-filled similarity stays, as the score of
+ * the paper against the query.
+ */
+function showAnnotation(result: HybridSearchResult, evidence: AnnotationEvidence): void {
+  result.chunkText = annotationSnippet(evidence);
+  result.textSource = 'annotation';
+  result.pageNumber = evidence.pageNumber;
+  result.annotationKey = evidence.annotationKey;
+  result.attachmentKey = evidence.attachmentKey;
+  delete result.chunkIndex;
+  delete result.paragraphIndex;
+  delete result.noteKey;
 }
 
 /**
@@ -238,6 +291,24 @@ export class HybridSearchEngine {
     // Only the rows actually being returned need it, now that nothing
     // downstream filters on the result.
     const backfilled = await this.backfillKeywordHits(top, query, queryEmbedding, opts);
+
+    // A keyword-only hit that came from an annotation shows the annotation
+    // whenever it holds more of the query than the chosen passage does. Comments
+    // are not indexed, so for a phrase that exists only in one, no passage holds
+    // it and the back-fill could only offer an unrelated one (issue #65). Rows
+    // the semantic leg found keep their chunk, for the reason given in
+    // `backfillKeywordHits`.
+    const annotations = new Map<number, AnnotationChoice>();
+    for (const r of keywordResults) {
+      if (r.annotation) annotations.set(r.itemId, r.annotation);
+    }
+    for (const result of top) {
+      if (result.source !== 'keyword') continue;
+      const choice = annotations.get(result.itemId);
+      if (choice && annotationWins(choice, backfilled.get(result.itemId)?.termHits)) {
+        showAnnotation(result, choice.evidence);
+      }
+    }
 
     await Promise.all([
       this.populateItemMetadata(top),
@@ -399,6 +470,12 @@ export class HybridSearchEngine {
       source: 'keyword' as const,
     }));
 
+    // Keyword mode reads no passages, so a matched annotation is the only
+    // excerpt there is (issue #65).
+    results.forEach((r, index) => {
+      if (r.annotation) showAnnotation(hybridResults[index], r.annotation.evidence);
+    });
+
     await this.populateItemMetadata(hybridResults.slice(0, opts.finalTopK));
     return hybridResults.slice(0, opts.finalTopK);
   }
@@ -476,7 +553,7 @@ export class HybridSearchEngine {
   private async keywordSearchQuery(
     query: string,
     opts: Required<Omit<HybridSearchOptions, 'collectionId' | 'libraryId' | 'mode'>> & HybridSearchOptions
-  ): Promise<Array<{ itemId: number; score: number }>> {
+  ): Promise<KeywordHit[]> {
     try {
       // Use Zotero's quick search
       const search = new Zotero.Search();
@@ -531,8 +608,18 @@ export class HybridSearchEngine {
       const queryYearMatch = query.match(/\b(19|20)\d{2}\b/);
       const queryYear = queryYearMatch ? queryYearMatch[0] : null;
 
+      // Keep, for each paper, the matched annotation that best explains the hit,
+      // so it can be shown instead of an unrelated passage (issue #65).
+      const annotationCandidates: AnnotationCandidate[] = [];
+      for (const fact of facts) {
+        if (fact.annotation && fact.owner) {
+          annotationCandidates.push({ ownerId: fact.owner.itemId, evidence: fact.annotation });
+        }
+      }
+      const annotations = chooseAnnotationEvidence(annotationCandidates, queryTerms);
+
       // Score each result based on match quality
-      const scoredResults: Array<{ itemId: number; score: number }> = [];
+      const scoredResults: KeywordHit[] = [];
 
       for (const itemId of itemIds) {
         try {
@@ -582,10 +669,10 @@ export class HybridSearchEngine {
           // Cap score at 1.0 (100%)
           score = Math.min(score, 1.0);
 
-          scoredResults.push({ itemId, score });
+          scoredResults.push({ itemId, score, annotation: annotations.get(itemId) });
         } catch (e) {
           // If we can't get item metadata, use base score
-          scoredResults.push({ itemId, score: 0.5 });
+          scoredResults.push({ itemId, score: 0.5, annotation: annotations.get(itemId) });
         }
       }
 

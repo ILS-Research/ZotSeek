@@ -1261,6 +1261,35 @@ relevance order at all.
 Grandchildren resolve in one step: an annotation hangs off an attachment, and
 what it resolves to is the paper at the top of that chain, not the PDF.
 
+#### Annotation matches keep their annotation
+
+Resolution used to discard *what* matched along with the child. For a PDF or a
+note that is harmless, because the back-fill (see `backfillKeywordHits`) finds
+the indexed passage holding the query's words. Annotation comments are not
+indexed, so for a phrase that exists only in a comment no passage holds it, and
+the back-fill fell back to the passage closest in meaning, which was usually
+unrelated (issue #65).
+
+The keyword leg therefore keeps, per paper, the matched annotation covering the
+most query terms (comment and highlighted text counted together), and a
+keyword-only hit shows it when it covers more terms than the chosen passage:
+
+```
+keyword-only hit with a matched annotation
+        │
+        ├── annotation terms >  passage terms ──► excerpt = comment + “highlight”
+        │                                         textSource 'annotation', page from
+        │                                         annotationPosition.pageIndex, opens
+        │                                         the reader on the annotation
+        └── annotation terms <= passage terms ──► the passage stays (a true excerpt
+                                                  with a page in the document)
+```
+
+`keyword` mode reads no passages, so a matched annotation is always the excerpt
+there. Rows the semantic leg also found keep their semantic chunk. The logic is
+pure and tested in `src/core/keyword-annotations.ts`; the `'annotation'`
+`TextSourceType` is never written to the database.
+
 ### Keyword Scoring
 
 For keyword-only results, we calculate relevance scores based on:

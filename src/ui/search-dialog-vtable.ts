@@ -132,6 +132,32 @@ function resolveNoteItemId(parentItemId: number, noteKey: string): number | null
   }
 }
 
+/**
+ * Open the reader on the annotation a keyword hit came from (issue #65).
+ *
+ * The annotation and its attachment are stored as keys and resolved in the
+ * parent's library, as notes are. Returns false when either no longer
+ * resolves, so the caller can fall back to opening the paper. Module-level for
+ * the same reason as resolveNoteItemId.
+ */
+async function openAnnotation(parentItemId: number, attachmentKey: string, annotationKey: string): Promise<boolean> {
+  try {
+    const parent = Zotero.Items.get(parentItemId);
+    if (!parent) return false;
+    const attachment = Zotero.Items.getByLibraryAndKey(parent.libraryID, attachmentKey);
+    const annotation = Zotero.Items.getByLibraryAndKey(parent.libraryID, annotationKey);
+    if (!attachment || attachment.deleted || !annotation || annotation.deleted) return false;
+    await Zotero.Reader.open(attachment.id, { annotationID: annotationKey });
+    return true;
+  } catch (error: any) {
+    Zotero.debug(
+      `[ZotSeek:SearchDialog] Could not open annotation ${annotationKey}: ` +
+      `${error?.message || error?.toString() || 'Unknown error'}`
+    );
+    return false;
+  }
+}
+
 export class ZotSeekDialogVTable {
   private logger: Logger;
   private zoteroAPI: ZoteroAPI;
@@ -1196,7 +1222,7 @@ export class ZotSeekDialogVTable {
       const hybridResult = result as HybridSearchResult;
       const pageNumber = exactPage || hybridResult.pageNumber;
 
-      this.openItem(localId, pageNumber, hybridResult.noteKey);
+      this.openItem(localId, pageNumber, hybridResult.noteKey, hybridResult);
     }
   }
 
@@ -1224,7 +1250,7 @@ export class ZotSeekDialogVTable {
       const exactPage = this.resultsTable?.getExactPage(localId);
       const hybridResult = result as HybridSearchResult;
       const pageNumber = exactPage || hybridResult.pageNumber;
-      this.openItem(localId, pageNumber, hybridResult.noteKey);
+      this.openItem(localId, pageNumber, hybridResult.noteKey, hybridResult);
     } else {
       // Multiple selection: select all in Zotero library (skip orphans)
       const itemIds = results
@@ -1244,12 +1270,27 @@ export class ZotSeekDialogVTable {
    *
    * When the result came from a child note, the note itself is selected
    * rather than its parent: selecting a note already shows it in the
-   * right-hand pane, which is what every other result does too. A key that
-   * no longer resolves falls back to the parent item, so a stale key costs
+   * right-hand pane, which is what every other result does too. When it came
+   * from an annotation, the reader opens on that annotation. A key that no
+   * longer resolves falls back to the parent item, so a stale key costs
    * precision, not the click.
    */
-  private async openItem(itemId: number, pageNumber?: number, noteKey?: string): Promise<void> {
+  private async openItem(
+    itemId: number,
+    pageNumber?: number,
+    noteKey?: string,
+    annotation?: { annotationKey?: string; attachmentKey?: string }
+  ): Promise<void> {
     try {
+      if (annotation?.annotationKey && annotation.attachmentKey) {
+        this.zoteroAPI.selectItem(itemId);
+        if (await openAnnotation(itemId, annotation.attachmentKey, annotation.annotationKey)) {
+          this.logger.info(`Opened annotation ${annotation.annotationKey} of item ${itemId}`);
+          return;
+        }
+        this.logger.warn(`Annotation ${annotation.annotationKey} of item ${itemId} is gone; opening the item instead`);
+      }
+
       const noteId = noteKey ? resolveNoteItemId(itemId, noteKey) : null;
       if (noteId) {
         this.zoteroAPI.selectItem(noteId);

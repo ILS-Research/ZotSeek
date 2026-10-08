@@ -21,6 +21,8 @@
  * lives in hybrid-search.ts.
  */
 
+import type { AnnotationEvidence } from './keyword-annotations';
+
 /**
  * What one keyword match looks like once Zotero has been asked about it.
  *
@@ -39,6 +41,11 @@ export interface KeywordMatchFacts {
   isRegularItem: boolean;
   /** The top-level item this match belongs to, when the match is a child. */
   owner?: { itemId: number; itemType: string } | null;
+  /**
+   * What the annotation says, when the match is one. Resolution ignores it;
+   * the keyword leg uses it to show the annotation as the hit's excerpt.
+   */
+  annotation?: AnnotationEvidence;
 }
 
 export interface ResolveKeywordMatchesOptions {

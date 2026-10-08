@@ -222,6 +222,7 @@ zotseek-source-methods = Methods
 zotseek-source-results = Results
 zotseek-source-content = Content
 zotseek-source-note = Note
+zotseek-source-annotation = Annotation
 zotseek-search-hybrid-menuitem =
     .label = 🔗 Hybrid (Recommended)
 zotseek-search-semantic-menuitem =

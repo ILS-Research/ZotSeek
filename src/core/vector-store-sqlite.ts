@@ -38,7 +38,8 @@ export type TextSourceType =
   | 'methods'       // Introduction, Background, Methods, etc.
   | 'findings'      // Results, Discussion, Conclusions, etc.
   | 'content'       // Generic content (fallback when sections not detected)
-  | 'note';         // Child note text (issue #50)
+  | 'note'          // Child note text (issue #50)
+  | 'annotation';   // Annotation comment shown for a keyword hit; never stored (issue #65)
 
 export interface PaperEmbedding {
   // Internal surrogate PK (assigned by SQLite on insert). Optional on input,
