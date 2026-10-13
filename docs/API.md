@@ -2,7 +2,7 @@
 
 ZotSeek exposes a JavaScript API at `Zotero.ZotSeek.api` that other Zotero plugins can use to run local semantic searches against the user's indexed library.
 
-All operations are local — embeddings are generated via Transformers.js (ONNX Runtime, WASM) and stored in a local SQLite file. No network calls are made. If the user configured an inference-server model, ZotSeek talks to that server only; see [`embed()`](#embedtexts-kind).
+All operations are local — embeddings are generated via Transformers.js (ONNX Runtime, WASM) and stored in a local SQLite file. No network calls are made. The exception is the optional inference server: by default it must run on this machine; in this fork the user can additionally allow named hosts on the network (see [`embed()`](#embedtexts-kind)).
 
 > Looking for access from *outside* Zotero (CLI scripts, AI agents, MCP clients)? See [MCP.md](MCP.md) for the local MCP server and REST endpoints.
 
@@ -209,7 +209,7 @@ if (!model) {
 
 **Returns:** `{ id: string; label: string; dimensions: number; runtime: 'onnx' | 'server' } | null`
 
-`id` is stable for an index (for example `"nomic-embed-text-v1.5"`). `runtime` is `'onnx'` for the built-in model that runs in Zotero and `'server'` for a model on an inference server the user configured in ZotSeek.
+`id` is stable for an index (for example `"nomic-embed-text-v1.5"`). `runtime` is `'onnx'` for the built-in model that runs in Zotero and `'server'` for a model served by an inference server set up in ZotSeek (LM Studio, Ollama, llama.cpp or vLLM): on the same machine, or, in this fork, on a host the user explicitly allowed.
 
 Vectors from different models are not comparable. Check `id` before every use and store it with your vectors. If the user switches the model, rebuild your index instead of mixing vectors.
 
@@ -231,7 +231,7 @@ const [queryVector] = await Zotero.ZotSeek.api.embed(['what is asymmetric search
 
 **Throws** if the user has not allowed it, or if `texts` is not an array of strings.
 
-Texts are embedded one at a time on the local worker for the built-in model. With a server model, `'doc'` texts are sent to that server in batches, so they go where the user configured ZotSeek to send them, and nowhere else. Callers get the vectors of the texts they pass, plus the model's id, label, dimensions and runtime. They do not get access to the library, the index or ZotSeek's stored vectors.
+Texts are embedded one at a time on the local worker for the built-in model. With a server model, `'doc'` texts are sent in batches to the inference server set up in ZotSeek. Upstream ZotSeek only talks to `127.0.0.1`, `localhost` or `[::1]`. **This fork** can also talk to hosts the user lists under Settings → ZotSeek → Local inference server → *Allowed remote hosts* (preference `zotseek.server.allowedRemoteHosts`, empty by default, exact host names). For such a host the texts you pass leave the machine, and a calling plugin cannot see which host that is; the user decides, and the setting's own warning explains the consequence (see [ILS-REMOTE-INFERENCE.md](ILS-REMOTE-INFERENCE.md), in German). Nothing is sent anywhere but that one configured server. Callers get the vectors of the texts they pass, plus the model's id, label, dimensions and runtime. They do not get access to the library, the index or ZotSeek's stored vectors.
 
 ## Example: Plugin integration
 

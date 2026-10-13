@@ -1,4 +1,4 @@
-# Entfernter Inference-Server (ILS-Fork, Branch `ils`)
+# Entfernter Inference-Server (ILS-Fork, Branch `ils-seekbook`)
 
 Upstream-ZotSeek spricht nur mit einem Inference-Server auf dem eigenen Rechner
 (`127.0.0.1`, `localhost`, `[::1]`); eine Einstellung zum Abschalten gibt es dort nicht.
